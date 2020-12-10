@@ -6,12 +6,11 @@
 # An example controller showing a sample home page
 GET     /                           controllers.HomeController.index
 GET     /hello                      controllers.HomeController.hello
-GET     /messages/:msg              controllers.DemoController.greeting(msg: String)
 
 GET     /users                      controllers.DemoController.index
-GET     /users/:id                  controllers.DemoController.get
-PUT     /users/:id                  controllers.DemoController.put
-DELETE  /users/:id                  controllers.DemoController.delete
+GET     /users/:id                  controllers.DemoController.get(id: Int)
+PUT     /users/:id                  controllers.DemoController.put(id: Int)
+DELETE  /users/:id                  controllers.DemoController.delete(id: Int)
 POST    /users                      controllers.DemoController.create
 
 # Map static resources from the /public folder to the /assets URL path
