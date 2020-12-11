@@ -13,5 +13,10 @@ PUT     /users/:id                  controllers.DemoController.put(id: Int)
 DELETE  /users/:id                  controllers.DemoController.delete(id: Int)
 POST    /users                      controllers.DemoController.create
 
+
+GET     /keys/:key                  controllers.KeysController.get(key: String)
+POST    /keys                       controllers.KeysController.post
+DELETE  /keys/:key                  controllers.KeysController.remove(key: String)
+
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)

@@ -6,20 +6,24 @@ import play.api.mvc._
 
 import javax.inject.{Inject, Singleton}
 import scala.collection.mutable
+import scala.concurrent.Future
+import context.ExecutionContextImplicit._
 
 case class User(id: Int, name: String, firstName: String)
 
 object User {
-  implicit val userToJson = Json.format[User]
-  implicit val userReads = Json.reads[User]
+  implicit val userToJson: OFormat[User] = Json.format[User]
+  implicit val userReads: Reads[User] = Json.reads[User]
 }
 
 object Datastore {
   val users: mutable.HashMap[Int, User] = mutable.HashMap()
 
-  def get(id: Int): Option[User] = users get id
+  def get(id: Int): Future[Option[User]] = Future {
+    users get id
+  }
 
-  def create(id: Int, data: User): Either[ValidationError, User] = {
+  def create(id: Int, data: User): Future[Either[ValidationError, User]] = Future {
     users get id match {
       case Some(_) => Left(ValidationError("user already existed"))
       case _ =>
@@ -27,7 +31,7 @@ object Datastore {
         Right(data)
     }
   }
-  def update(id: Int, data: User): Either[ValidationError, User] = {
+  def update(id: Int, data: User): Future[Either[ValidationError, User]] = Future {
     users get id match {
       case Some(_) =>
           users += id -> data
@@ -35,7 +39,7 @@ object Datastore {
       case _ => Left(ValidationError("user not found"))
     }
   }
-  def delete(id: Int): Unit = {
+  def delete(id: Int): Future[Unit] = Future {
     users -= id
   }
 }
@@ -44,57 +48,59 @@ object Datastore {
 class DemoController @Inject()(val controllerComponents: ControllerComponents)
   extends BaseController {
 
-  def index(): Action[AnyContent] = Action {
-    Ok(Json.obj(
+  def index(): Action[AnyContent] = Action.async {
+    Future(Ok(Json.obj(
       "users" -> Datastore.users
-    ))
+    )))
   }
 
-  def create(): Action[AnyContent] = Action { request =>
+  def create(): Action[AnyContent] = Action.async { request =>
     request.body.asJson match {
       case Some(value) =>
         val userFromJson: JsResult[User] = Json.fromJson[User] (value)
         userFromJson match {
-          case e @ JsError(_) => Results.BadRequest(JsError.toJson(e).toString())
+          case e @ JsError(_) => Future.successful(BadRequest(JsError.toJson(e).toString()))
           case JsSuccess(u: User, _) =>
-            Datastore.create (u.id, u) match {
-              case Left(value) => Results.BadRequest(value.message)
+            Datastore.create (u.id, u).map {
+              case Left(value) => BadRequest(value.message)
               case Right(_) => Redirect("/users")
             }
         }
-      case _ => Results.BadRequest("missing body")
+      case _ => Future.successful(BadRequest("missing body"))
     }
   }
 
-  def get(id: Int): Action[AnyContent] = Action {
-    Datastore.get(id) match {
+  def get(id: Int): Action[AnyContent] = Action.async {
+    Datastore.get(id).map {
       case Some(user) => Ok(Json.toJson(user))
       case _ => NotFound
     }
   }
 
-  def put(id: Int): Action[AnyContent] = Action { request =>
+  def put(id: Int): Action[AnyContent] = Action.async { request =>
     request.body.asJson match {
       case Some(jsValue) =>
         val userFromJson: JsResult[User] = Json.fromJson[User](jsValue)
         userFromJson match {
-          case e @ JsError(_) => Results.BadRequest(JsError.toJson(e).toString())
+          case e @ JsError(_) => Future.successful(BadRequest(JsError.toJson(e).toString()))
           case JsSuccess(u: User, _) =>
-            Datastore.update(id, u) match {
-              case Left(value) => Results.BadRequest(value.message)
+            Datastore.update(id, u).map {
+              case Left(value) => BadRequest(value.message)
               case Right(_) => Ok("updated")
             }
         }
     }
   }
 
-  def delete(id: Int): Action[AnyContent] = Action {
+  def delete(id: Int): Action[AnyContent] = Action.async {
     val usersSize = Datastore.users.size
     Datastore.delete(id)
-    if (usersSize == Datastore.users.size)
-      BadRequest("user id not found")
-    else
-      Ok("user removed")
+    Future {
+      if (usersSize == Datastore.users.size)
+        BadRequest("user id not found")
+      else
+        Ok("user removed")
+    }
   }
 
 }
